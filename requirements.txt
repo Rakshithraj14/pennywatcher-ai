@@ -6,4 +6,8 @@ pandas
 numpy
 yfinance
 python-dotenv
-
+flask
+flask-cors
+scikit-learn
+pytest
+pytest-mock
