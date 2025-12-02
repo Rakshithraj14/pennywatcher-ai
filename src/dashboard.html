@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stock Tracker Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/luxon@3.0.1/build/global/luxon.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-luxon@1.1.0"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #0f172a;
+            color: #e2e8f0;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        h1 {
+            font-size: 2rem;
+            margin-bottom: 20px;
+            color: #38bdf8;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+        
+        .stat-card {
+            background: #1e293b;
+            border-radius: 8px;
+            padding: 20px;
+            border: 1px solid #334155;
+        }
+        
+        .stat-label {
+            font-size: 0.875rem;
+            color: #94a3b8;
+            margin-bottom: 8px;
+        }
+        
+        .stat-value {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: #f1f5f9;
+        }
+        
+        .positive {
+            color: #34d399;
+        }
+        
+        .negative {
+            color: #f87171;
+        }
+        
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        
+        select, button {
+            padding: 10px 15px;
+            border-radius: 6px;
+            border: 1px solid #334155;
+            background: #1e293b;
+            color: #e2e8f0;
+            cursor: pointer;
+            font-size: 0.875rem;
+        }
+        
+        button:hover {
+            background: #334155;
+        }
+        
+        .chart-container {
+            background: #1e293b;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border: 1px solid #334155;
+        }
+        
+        .indicators-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .indicator-card {
+            background: #1e293b;
+            border-radius: 8px;
+            padding: 15px;
+            border: 1px solid #334155;
+        }
+        
+        .signal-badge {
+            display: inline-block;
+            padding: 5px 12px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            margin-top: 8px;
+        }
+        
+        .signal-BUY, .signal-STRONG_BUY {
+            background: #10b981;
+            color: white;
+        }
+        
+        .signal-SELL, .signal-STRONG_SELL {
+            background: #ef4444;
+            color: white;
+        }
+        
+        .signal-HOLD {
+            background: #6b7280;
+            color: white;
+        }
+        
+        .positions-table {
+            background: #1e293b;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border: 1px solid #334155;
+            overflow-x: auto;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #334155;
+        }
+        
+        th {
+            color: #94a3b8;
+            font-weight: 600;
+            font-size: 0.875rem;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #94a3b8;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📈 Stock Tracker Dashboard</h1>
+        
+        <div class="stats-grid" id="stats">
+            <div class="stat-card">
+                <div class="stat-label">Portfolio Value</div>
+                <div class="stat-value" id="portfolioValue">--</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Cash</div>
+                <div class="stat-value" id="cash">--</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">P&L</div>
+                <div class="stat-value" id="pnl">--</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Open Positions</div>
+                <div class="stat-value" id="openPositions">--</div>
+            </div>
+        </div>
+        
+        <div class="controls">
+            <select id="symbolSelect">
+                <option value="">Loading stocks...</option>
+            </select>
+            <select id="strategySelect">
+                <option value="combined">Combined Strategy</option>
+                <option value="sma">SMA Crossover</option>
+                <option value="rsi">RSI</option>
+                <option value="macd">MACD</option>
+                <option value="bollinger">Bollinger Bands</option>
+            </select>
+            <button onclick="loadData()">Refresh</button>
+            <button onclick="analyzeStock()">Analyze</button>
+        </div>
+        
+        <div class="chart-container">
+            <canvas id="priceChart"></canvas>
+        </div>
+        
+        <div class="indicators-grid" id="indicators">
+            <div class="loading">Select a stock to view indicators</div>
+        </div>
+        
+        <div class="positions-table">
+            <h2 style="margin-bottom: 15px;">Open Positions</h2>
+            <table id="positionsTable">
+                <thead>
+                    <tr>
+                        <th>Symbol</th>
+                        <th>Quantity</th>
+                        <th>Avg Price</th>
+                        <th>Current Price</th>
+                        <th>Value</th>
+                        <th>P&L</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td colspan="6" class="loading">Loading...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+    
+    <script>
+        const API_BASE = 'http://localhost:5000/api';
+        let priceChart = null;
+        
+        async function fetchAPI(endpoint) {
+            const response = await fetch(`${API_BASE}${endpoint}`);
+            if (!response.ok) throw new Error(`API error: ${response.statusText}`);
+            return response.json();
+        }
+        
+        async function loadStocks() {
+            try {
+                const data = await fetchAPI('/stocks');
+                const select = document.getElementById('symbolSelect');
+                select.innerHTML = data.stocks.map(s => 
+                    `<option value="${s}">${s}</option>`
+                ).join('');
+                
+                if (data.stocks.length > 0) {
+                    loadData();
+                }
+            } catch (error) {
+                console.error('Error loading stocks:', error);
+            }
+        }
+        
+        async function loadPortfolio() {
+            try {
+                const data = await fetchAPI('/portfolio');
+                const perf = data.performance;
+                
+                document.getElementById('portfolioValue').textContent = 
+                    `$${perf.total_value.toLocaleString('en-US', {maximumFractionDigits: 2})}`;
+                document.getElementById('cash').textContent = 
+                    `$${perf.current_cash.toLocaleString('en-US', {maximumFractionDigits: 2})}`;
+                
+                const pnlEl = document.getElementById('pnl');
+                pnlEl.textContent = `$${perf.pnl.toLocaleString('en-US', {maximumFractionDigits: 2})} (${perf.pnl_pct.toFixed(2)}%)`;
+                pnlEl.className = `stat-value ${perf.pnl >= 0 ? 'positive' : 'negative'}`;
+                
+                document.getElementById('openPositions').textContent = perf.num_positions;
+                
+                // Load positions table
+                const positions = data.positions;
+                const tbody = document.querySelector('#positionsTable tbody');
+                
+                if (positions.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: #94a3b8;">No open positions</td></tr>';
+                } else {
+                    tbody.innerHTML = positions.map(p => `
+                        <tr>
+                            <td>${p.symbol}</td>
+                            <td>${p.quantity}</td>
+                            <td>$${p.avg_price.toFixed(2)}</td>
+                            <td>$${(p.current_price || 0).toFixed(2)}</td>
+                            <td>$${p.total_value.toLocaleString('en-US', {maximumFractionDigits: 2})}</td>
+                            <td class="${p.unrealized_pnl >= 0 ? 'positive' : 'negative'}">
+                                $${p.unrealized_pnl.toFixed(2)}
+                            </td>
+                        </tr>
+                    `).join('');
+                }
+            } catch (error) {
+                console.error('Error loading portfolio:', error);
+            }
+        }
+        
+        async function loadData() {
+            const symbol = document.getElementById('symbolSelect').value;
+            if (!symbol) return;
+            
+            try {
+                const [candles, indicators] = await Promise.all([
+                    fetchAPI(`/stocks/${symbol}/candles?limit=200`),
+                    fetchAPI(`/stocks/${symbol}/indicators?candles=200`)
+                ]);
+                
+                renderChart(candles.candles);
+                renderIndicators(indicators);
+            } catch (error) {
+                console.error('Error loading data:', error);
+            }
+        }
+        
+        async function analyzeStock() {
+            const symbol = document.getElementById('symbolSelect').value;
+            const strategy = document.getElementById('strategySelect').value;
+            if (!symbol) return;
+            
+            try {
+                const result = await fetchAPI(`/stocks/${symbol}/analyze?strategy=${strategy}`);
+                alert(`${symbol} Signal: ${result.signal}\n${result.reason}\nConfidence: ${(result.confidence * 100).toFixed(0)}%`);
+            } catch (error) {
+                console.error('Error analyzing:', error);
+            }
+        }
+        
+        function renderChart(candles) {
+            const ctx = document.getElementById('priceChart').getContext('2d');
+            
+            if (priceChart) {
+                priceChart.destroy();
+            }
+            
+            priceChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: candles.map(c => c.t),
+                    datasets: [{
+                        label: 'Close Price',
+                        data: candles.map(c => c.c),
+                        borderColor: '#38bdf8',
+                        backgroundColor: 'rgba(56, 189, 248, 0.1)',
+                        tension: 0.1,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            labels: { color: '#e2e8f0' }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            type: 'time',
+                            time: { unit: 'day' },
+                            ticks: { color: '#94a3b8' },
+                            grid: { color: '#334155' }
+                        },
+                        y: {
+                            ticks: { color: '#94a3b8' },
+                            grid: { color: '#334155' }
+                        }
+                    }
+                }
+            });
+        }
+        
+        function renderIndicators(indicators) {
+            const container = document.getElementById('indicators');
+            const bb = indicators.bollinger || {};
+            const macd = indicators.macd || {};
+            
+            container.innerHTML = `
+                <div class="indicator-card">
+                    <div class="stat-label">Current Price</div>
+                    <div class="stat-value">$${indicators.current_price?.toFixed(2) || '--'}</div>
+                </div>
+                <div class="indicator-card">
+                    <div class="stat-label">RSI (14)</div>
+                    <div class="stat-value">${indicators.rsi?.toFixed(2) || '--'}</div>
+                    <small style="color: #94a3b8;">${indicators.rsi < 30 ? 'Oversold' : indicators.rsi > 70 ? 'Overbought' : 'Neutral'}</small>
+                </div>
+                <div class="indicator-card">
+                    <div class="stat-label">SMA 20 / 50</div>
+                    <div class="stat-value">${indicators.sma_20?.toFixed(2) || '--'} / ${indicators.sma_50?.toFixed(2) || '--'}</div>
+                </div>
+                <div class="indicator-card">
+                    <div class="stat-label">MACD</div>
+                    <div class="stat-value">${macd.macd?.toFixed(2) || '--'}</div>
+                    <small style="color: #94a3b8;">Signal: ${macd.signal?.toFixed(2) || '--'}</small>
+                </div>
+                <div class="indicator-card">
+                    <div class="stat-label">Bollinger Bands</div>
+                    <div class="stat-value">${bb.upper?.toFixed(2) || '--'}</div>
+                    <small style="color: #94a3b8;">Lower: ${bb.lower?.toFixed(2) || '--'}</small>
+                </div>
+                <div class="indicator-card">
+                    <div class="stat-label">Volatility</div>
+                    <div class="stat-value">${(indicators.volatility * 100)?.toFixed(2) || '--'}%</div>
+                </div>
+            `;
+        }
+        
+        // Initialize
+        loadStocks();
+        loadPortfolio();
+        
+        // Auto-refresh every 60 seconds
+        setInterval(() => {
+            loadData();
+            loadPortfolio();
+        }, 60000);
+    </script>
+</body>
+</html>
+

@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import List, Dict
 from config import config
 
-# Simple connection helper (not pooled) — replace with a pool for production
+# Simple connection helper 
 def get_conn():
     if not config.PG_URL:
         raise RuntimeError("PG_URL not set in env")
