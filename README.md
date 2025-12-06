@@ -361,3 +361,7 @@ For issues or questions:
 ---
 
 **Happy Trading! 📈**
+
+---
+
+Built with ⊹ ࣪ ﹏𓊝﹏𓂁﹏⊹ ࣪ ˖
